@@ -1,0 +1,77 @@
+import openpyxl
+from urllib.parse import quote
+import webbrowser
+from time import sleep
+import pyautogui
+import os
+import logging
+
+logging.basicConfig(filename="log_erros.log", level=logging.ERROR, format="%(asctime)s - %(message)s")
+
+def abrir_whatsapp():
+    """Abre o WhatsApp Web e aguarda o carregamento."""
+    webbrowser.open('https://web.whatsapp.com/')
+    sleep(30)  
+def carregar_clientes():
+    """Solicita o nome do arquivo ao usuário, carrega a planilha e retorna os dados."""
+    while True:
+        arquivo = input("Digite o nome do arquivo (com .xlsx no final): ").strip()
+        if not arquivo.endswith(".xlsx"):
+            print("Por favor, insira um arquivo válido com extensão .xlsx")
+            continue
+        if not os.path.exists(arquivo):
+            print(f"Arquivo '{arquivo}' não encontrado. Tente novamente.")
+            continue
+        try:
+            workbook = openpyxl.load_workbook(arquivo)
+            return workbook.active  
+        except Exception as e:
+            logging.error(f'Erro ao carregar planilha: {e}')
+            print("Erro ao abrir o arquivo. Verifique se está corrompido.")
+            continue
+
+def enviar_mensagem_whatsapp(nome, telefone, vencimento):
+    """Envia uma mensagem via WhatsApp Web para o cliente."""
+    if not nome or not telefone or not vencimento:
+        logging.error(f'Dados ausentes para {nome} - Telefone: {telefone}, Vencimento: {vencimento}')
+        return
+
+    mensagem = f'Olá {nome}, seu boleto vence no dia {vencimento.strftime("%d/%m/%Y")}.' \
+               ' Favor pagar no link https://www.link_do_pagamento.com'
+    
+    link_mensagem = f'https://web.whatsapp.com/send?phone={telefone}&text={quote(mensagem)}'
+    
+    try:
+        webbrowser.open(link_mensagem)
+        sleep(12) 
+        seta = pyautogui.locateCenterOnScreen('seta.png', confidence=0.8)
+        if not seta:
+            raise Exception(f'Botão de envio não encontrado para {nome}')
+        
+        sleep(2)
+        pyautogui.click(seta)
+        sleep(2)
+        pyautogui.hotkey('ctrl', 'w')
+        sleep(2)
+
+    except Exception as e:
+        logging.error(f'Erro ao enviar mensagem para {nome}: {e}')
+        with open('erros.csv', 'a', newline='', encoding='utf-8') as arquivo:
+            arquivo.write(f'{nome},{telefone}{os.linesep}')
+
+def main():
+    """Função principal para enviar mensagens aos clientes."""
+    abrir_whatsapp()
+    pagina_clientes = carregar_clientes()
+
+    total_clientes = 0
+    for linha in pagina_clientes.iter_rows(min_row=2):
+        nome, telefone, vencimento = linha[0].value, linha[1].value, linha[2].value
+        enviar_mensagem_whatsapp(nome, telefone, vencimento)
+        total_clientes += 1
+        sleep(8) 
+
+    print(f'Mensagens enviadas para {total_clientes} clientes.')
+
+if __name__ == "__main__":
+    main()
