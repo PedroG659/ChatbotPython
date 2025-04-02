@@ -1,53 +1,84 @@
 import openpyxl
 from urllib.parse import quote
 import webbrowser
-from time import sleep
+import time
 import pyautogui
-import os 
+import os
+from datetime import datetime
 
-def validar_telefone(numero):
+def esperar_elemento(imagem, timeout=30):
+    inicio = time.time()
+    while time.time() - inicio < timeout:
+        try:
+            elemento = pyautogui.locateCenterOnScreen(imagem, confidence=0.8)
+            if elemento:
+                return elemento
+        except pyautogui.ImageNotFoundException:
+            pass
+        time.sleep(2)
+    raise TimeoutError(f"Elemento {imagem} não encontrado em {timeout} segundos.")
 
-    numero = str(numero).replace(" ", "").replace("-", "")
-    if not numero.startswith("+"):
-        return "+55" + numero  
-    return numero
+def enviar_mensagem_whatsapp(numero, mensagem):
+    try:
+        mensagem_codificada = quote(mensagem)
+        url = f'https://web.whatsapp.com/send?phone={numero}&text={mensagem_codificada}'
+        
+        webbrowser.open(url, new=2)
+        time.sleep(10)
+        
+        botao_enviar = esperar_elemento('seta.png', timeout=15)
+        pyautogui.click(botao_enviar)
+        time.sleep(2)
+        
+        pyautogui.hotkey('ctrl', 'w')
+        return True
+    
+    except Exception as e:
+        print(f"Erro ao enviar mensagem para {numero}: {str(e)}")
+        return False
 
-def enviar_mensagem(nome, telefone, vencimento):
+def formatar_data(data):
+    if isinstance(data, datetime):
+        return data.strftime('%d/%m/%Y')
+    elif isinstance(data, str):
+        return data
+    else:
+        return "Data inválida"
 
-    telefone = validar_telefone(telefone)
-    mensagem = f'Olá {nome}, seu boleto vence no dia {vencimento.strftime("%d/%m/%Y")}.'
-    mensagem += ' Favor pagar no link https://www.link_do_pagamento.com'
+def main():
+    webbrowser.open('https://web.whatsapp.com/')
+    print("Por favor, faça login no WhatsApp Web em 30 segundos...")
+    time.sleep(30)
     
     try:
-        link = f'https://web.whatsapp.com/send?phone={telefone}&text={quote(mensagem)}'
-        webbrowser.open(link)
-        sleep(15)  
-        
-        seta = pyautogui.locateCenterOnScreen('seta.png', confidence=0.8)
-        if seta:
-            pyautogui.click(seta)
-            sleep(3)
-            pyautogui.hotkey('ctrl', 'w')
-        else:
-            raise Exception("Botão de envio não encontrado")
+        workbook = openpyxl.load_workbook('clientes.xlsx')
+        pagina_clientes = workbook['Sheet1']
     except Exception as e:
-        print(f'Erro ao enviar mensagem para {nome}: {e}')
-        with open('erros.csv', 'a', newline='', encoding='utf-8') as arquivo:
-            arquivo.write(f'{nome},{telefone}{os.linesep}')
+        print(f"Erro ao carregar a planilha: {e}")
+        return
+    
+    for linha in pagina_clientes.iter_rows(min_row=2):
+        nome = linha[0].value
+        telefone = str(linha[1].value).strip()
+        vencimento = linha[2].value
+        
+        if not nome or not telefone or not vencimento:
+            print(f"Dados incompletos para a linha: {linha[0].row}")
+            continue
+        
+        data_formatada = formatar_data(vencimento)
+        mensagem = (
+            f"Olá {nome}, seu boleto vence no dia {data_formatada}. "
+            "Favor pagar no link: https://www.link_do_pagamento.com"
+        )
+        
+        sucesso = enviar_mensagem_whatsapp(telefone, mensagem)
+        
+        if not sucesso:
+            with open('erros.csv', 'a', encoding='utf-8') as arquivo:
+                arquivo.write(f"{nome},{telefone}\n")
+    
+    print("Processo concluído. Verifique 'erros.csv' para falhas.")
 
-
-webbrowser.open('https://web.whatsapp.com/')
-sleep(35)  
-
-workbook = openpyxl.load_workbook('clientes.xlsx')
-pagina_clientes = workbook['Sheet1']
-
-for linha in pagina_clientes.iter_rows(min_row=2, values_only=True):
-    nome, telefone, vencimento = linha
-    if nome and telefone and vencimento:
-        enviar_mensagem(nome, telefone, vencimento)
-    else:
-        print(f'Erro: Dados inválidos para {nome}. Pulando...')
-
-workbook.close()
-print("Processo concluído!")
+if __name__ == "__main__":
+    main()
