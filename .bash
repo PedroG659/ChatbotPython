@@ -9,7 +9,3 @@ git push --force
 
 
 
-echo ".env" >> .gitignore
-git add .gitignore
-git commit -m "Ignorar arquivos .env"
-git push
