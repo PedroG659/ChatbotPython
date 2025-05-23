@@ -43,10 +43,7 @@ def esperar_elemento(imagem, timeout=30):
     raise TimeoutError(f"Elemento {imagem} não encontrado em {timeout} segundos.")
 
 def confirmacao_visual(nome, telefone, mensagem):
-    """
-    Exibe uma janela de confirmação visual com os detalhes da mensagem
-    e aguarda a confirmação do usuário antes de enviar.
-    """
+    
     confirmacao_texto = (
         f"📋 Confirmação de Envio\n\n"
         f"👤 Nome: {nome}\n"
@@ -122,7 +119,6 @@ def main():
 
         print(f"\nPreparando envio para {nome} ({telefone})...")
         
-        # Confirmação visual antes de enviar
         if not confirmacao_visual(nome, telefone, mensagem):
             print(f"Envio para {nome} cancelado pelo usuário.")
             continue
