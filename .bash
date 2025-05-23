@@ -6,3 +6,10 @@ git rebase -i HEAD~2  # Substitua "2" pelo número de commits a revisar
 git commit --amend
 git rebase --continue
 git push --force
+
+
+
+echo ".env" >> .gitignore
+git add .gitignore
+git commit -m "Ignorar arquivos .env"
+git push
