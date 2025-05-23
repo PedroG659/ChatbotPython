@@ -6,6 +6,8 @@ import pyautogui
 import os
 from datetime import datetime
 
+confirmar_envio = True
+
 def esperar_elemento(imagem, timeout=30):
     inicio = time.time()
     while time.time() - inicio < timeout:
@@ -19,6 +21,8 @@ def esperar_elemento(imagem, timeout=30):
     raise TimeoutError(f"Elemento {imagem} não encontrado em {timeout} segundos.")
 
 def enviar_mensagem_whatsapp(numero, mensagem):
+    global confirmar_envio
+
     try:
         mensagem_codificada = quote(mensagem)
         url = f'https://web.whatsapp.com/send?phone={numero}&text={mensagem_codificada}'
@@ -27,12 +31,26 @@ def enviar_mensagem_whatsapp(numero, mensagem):
         time.sleep(10)
         
         botao_enviar = esperar_elemento('seta.png', timeout=15)
+
+        # CONFIRMAÇÃO AVANÇADA
+        if confirmar_envio:
+            resposta = pyautogui.confirm(
+                text=f"Pronto para enviar a mensagem para {numero}?\n\n{mensagem}",
+                title='Confirmação de Envio',
+                buttons=['Sim', 'Pular todos os próximos', 'Não']
+            )
+            if resposta == 'Pular todos os próximos':
+                confirmar_envio = False
+            elif resposta == 'Não':
+                pyautogui.hotkey('ctrl', 'w')
+                return False
+
         pyautogui.click(botao_enviar)
         time.sleep(2)
         
         pyautogui.hotkey('ctrl', 'w')
         return True
-    
+
     except Exception as e:
         print(f"Erro ao enviar mensagem para {numero}: {str(e)}")
         return False
@@ -47,8 +65,8 @@ def formatar_data(data):
 
 def main():
     webbrowser.open('https://web.whatsapp.com/')
-    print("Por favor, faça login no WhatsApp Web em 30 segundos...")
-    time.sleep(30)
+    print("Por favor, faça login no WhatsApp Web em 10 segundos...")
+    time.sleep(10)
     
     try:
         workbook = openpyxl.load_workbook('clientes.xlsx')
