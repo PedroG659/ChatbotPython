@@ -3,10 +3,32 @@ from urllib.parse import quote
 import webbrowser
 import time
 import pyautogui
-import os
 from datetime import datetime
+import openai
+import os
 
-confirmar_envio = True
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+def gerar_mensagem_com_ia(nome, data_venc):
+    prompt = (
+        f"Crie uma mensagem educada e simpática para um cliente chamado {nome}, "
+        f"lembrando que o boleto dele vence no dia {data_venc}. "
+        "Use um tom informal e amigável."
+    )
+    try:
+        resposta = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=100,
+            temperature=0.8,
+        )
+        return resposta['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        print(f"Erro ao gerar mensagem com IA: {e}")
+        return (
+            f"Olá {nome}, seu boleto vence no dia {data_venc}. "
+            "Favor pagar no link: https://www.link_do_pagamento.com"
+        )
 
 def esperar_elemento(imagem, timeout=30):
     inicio = time.time()
@@ -20,9 +42,34 @@ def esperar_elemento(imagem, timeout=30):
         time.sleep(2)
     raise TimeoutError(f"Elemento {imagem} não encontrado em {timeout} segundos.")
 
-def enviar_mensagem_whatsapp(numero, mensagem):
-    global confirmar_envio
+def confirmacao_visual(nome, telefone, mensagem):
+    """
+    Exibe uma janela de confirmação visual com os detalhes da mensagem
+    e aguarda a confirmação do usuário antes de enviar.
+    """
+    confirmacao_texto = (
+        f"📋 Confirmação de Envio\n\n"
+        f"👤 Nome: {nome}\n"
+        f"📞 Telefone: {telefone}\n\n"
+        f"💬 Mensagem:\n{mensagem}\n\n"
+        f"Deseja enviar esta mensagem?"
+    )
+    
+    try:
+        resposta = pyautogui.confirm(
+            text=confirmacao_texto,
+            title='Confirmação de Envio',
+            buttons=['Enviar', 'Cancelar']
+        )
+        return resposta == 'Enviar'
+    except Exception as e:
+        print(f"Erro na confirmação visual: {e}")
+        print("\n" + "="*50)
+        print(confirmacao_texto)
+        resposta = input("\nDigite 'S' para enviar ou qualquer tecla para cancelar: ")
+        return resposta.lower() == 's'
 
+def enviar_mensagem_whatsapp(numero, mensagem):
     try:
         mensagem_codificada = quote(mensagem)
         url = f'https://web.whatsapp.com/send?phone={numero}&text={mensagem_codificada}'
@@ -31,26 +78,12 @@ def enviar_mensagem_whatsapp(numero, mensagem):
         time.sleep(10)
         
         botao_enviar = esperar_elemento('seta.png', timeout=15)
-
-        # CONFIRMAÇÃO AVANÇADA
-        if confirmar_envio:
-            resposta = pyautogui.confirm(
-                text=f"Pronto para enviar a mensagem para {numero}?\n\n{mensagem}",
-                title='Confirmação de Envio',
-                buttons=['Sim', 'Pular todos os próximos', 'Não']
-            )
-            if resposta == 'Pular todos os próximos':
-                confirmar_envio = False
-            elif resposta == 'Não':
-                pyautogui.hotkey('ctrl', 'w')
-                return False
-
         pyautogui.click(botao_enviar)
         time.sleep(2)
         
         pyautogui.hotkey('ctrl', 'w')
         return True
-
+    
     except Exception as e:
         print(f"Erro ao enviar mensagem para {numero}: {str(e)}")
         return False
@@ -85,17 +118,22 @@ def main():
             continue
         
         data_formatada = formatar_data(vencimento)
-        mensagem = (
-            f"Olá {nome}, seu boleto vence no dia {data_formatada}. "
-            "Favor pagar no link: https://www.link_do_pagamento.com"
-        )
+        mensagem = gerar_mensagem_com_ia(nome, data_formatada)
+
+        print(f"\nPreparando envio para {nome} ({telefone})...")
         
+        # Confirmação visual antes de enviar
+        if not confirmacao_visual(nome, telefone, mensagem):
+            print(f"Envio para {nome} cancelado pelo usuário.")
+            continue
+        
+        print(f"Enviando para {nome} ({telefone}): {mensagem}")
         sucesso = enviar_mensagem_whatsapp(telefone, mensagem)
         
         if not sucesso:
             with open('erros.csv', 'a', encoding='utf-8') as arquivo:
                 arquivo.write(f"{nome},{telefone}\n")
-    
+
     print("Processo concluído. Verifique 'erros.csv' para falhas.")
 
 if __name__ == "__main__":
