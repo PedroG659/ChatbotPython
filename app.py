@@ -45,10 +45,10 @@ def esperar_elemento(imagem, timeout=30):
 def confirmacao_visual(nome, telefone, mensagem):
     
     confirmacao_texto = (
-        f"📋 Confirmação de Envio\n\n"
-        f"👤 Nome: {nome}\n"
-        f"📞 Telefone: {telefone}\n\n"
-        f"💬 Mensagem:\n{mensagem}\n\n"
+        f"Confirmação de Envio\n\n"
+        f"Nome: {nome}\n"
+        f"Telefone: {telefone}\n\n"
+        f"Mensagem:\n{mensagem}\n\n"
         f"Deseja enviar esta mensagem?"
     )
     
