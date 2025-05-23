@@ -30,6 +30,39 @@ def gerar_mensagem_com_ia(nome, data_venc):
             "Favor pagar no link: https://www.link_do_pagamento.com"
         )
 
+#BANCO DE DADOS------------------------------------------------------------------------------------------------------------------
+def conectar_banco():
+    return psycopg2.connect(  # Retorna o objeto de conexão com os parâmetros abaixo
+        dbname="chatbot",  # Nome do banco de dados
+        user="postgres",  # Nome do usuário do banco
+        password="postgres",  # Senha do usuário
+        host="localhost",  # Endereço do servidor (localhost = máquina local)
+        port="5432"  # Porta padrão do PostgreSQL
+    )
+
+# Define uma função chamada 'ler_clientes' que busca e retorna os dados dos clientes no banco
+def ler_clientes():
+    conexao = conectar_banco()  # Chama a função de conexão e guarda o objeto de conexão
+    cursor = conexao.cursor()  # Cria um cursor para executar comandos SQL
+    cursor.execute(  # Executa um comando SQL para selecionar dados da tabela 'clientes'
+        "SELECT id, nome, numero FROM clientes"
+    )
+    clientes = []  # Cria uma lista vazia que irá armazenar os dicionários com os dados dos clientes
+    for row in cursor.fetchall():  # Itera sobre todas as linhas retornadas pela consulta
+        cliente = {  # Cria um dicionário com os dados de cada cliente
+            "nome": row[0],  # Nome do cliente
+            "numero": row[1],  # Número de telefone
+        }
+        clientes.append(cliente)  # Adiciona o dicionário à lista de clientes
+    cursor.close()  # Fecha o cursor
+    conexao.close()  # Fecha a conexão com o banco de dados
+    return clientes  # Retorna a lista de clientes
+
+# Imprime no console o resultado da função 'ler_clientes', ou seja, a lista de dicionários com os dados dos clientes
+print(ler_clientes())
+
+#FIM BANCO DE DADOS----------------------------------------------------------------------------------------------------------------
+
 def esperar_elemento(imagem, timeout=30):
     inicio = time.time()
     while time.time() - inicio < timeout:
