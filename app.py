@@ -1,4 +1,4 @@
-import openpyxl
+import sqlite3
 from urllib.parse import quote
 import webbrowser
 import time
@@ -8,6 +8,65 @@ import openai
 import os
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Configuração do banco de dados
+DB_NAME = "clientes.db"
+
+def init_db():
+    """Inicializa o banco de dados e cria a tabela se não existir"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS clientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        telefone TEXT NOT NULL,
+        data_vencimento TEXT NOT NULL,
+        enviado INTEGER DEFAULT 0,
+        data_envio TEXT,
+        falha INTEGER DEFAULT 0
+    )
+    """)
+    
+    conn.commit()
+    conn.close()
+
+def get_clientes_pendentes():
+    """Retorna todos os clientes com mensagens não enviadas"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+    SELECT nome, telefone, data_vencimento 
+    FROM clientes 
+    WHERE enviado = 0 AND falha = 0
+    """)
+    
+    clientes = cursor.fetchall()
+    conn.close()
+    return clientes
+
+def marcar_enviado(telefone, sucesso):
+    """Marca o cliente como enviado ou com falha"""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    if sucesso:
+        cursor.execute("""
+        UPDATE clientes 
+        SET enviado = 1, data_envio = ?
+        WHERE telefone = ?
+        """, (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), telefone))
+    else:
+        cursor.execute("""
+        UPDATE clientes 
+        SET falha = 1
+        WHERE telefone = ?
+        """, (telefone,))
+    
+    conn.commit()
+    conn.close()
 
 def gerar_mensagem_com_ia(nome, data_venc):
     prompt = (
@@ -43,7 +102,6 @@ def esperar_elemento(imagem, timeout=30):
     raise TimeoutError(f"Elemento {imagem} não encontrado em {timeout} segundos.")
 
 def confirmacao_visual(nome, telefone, mensagem):
-    
     confirmacao_texto = (
         f"📋 Confirmação de Envio\n\n"
         f"👤 Nome: {nome}\n"
@@ -94,24 +152,22 @@ def formatar_data(data):
         return "Data inválida"
 
 def main():
+    # Inicializa o banco de dados
+    init_db()
+    
     webbrowser.open('https://web.whatsapp.com/')
     print("Por favor, faça login no WhatsApp Web em 10 segundos...")
     time.sleep(10)
     
-    try:
-        workbook = openpyxl.load_workbook('clientes.xlsx')
-        pagina_clientes = workbook['Sheet1']
-    except Exception as e:
-        print(f"Erro ao carregar a planilha: {e}")
+    clientes = get_clientes_pendentes()
+    
+    if not clientes:
+        print("Nenhum cliente pendente encontrado no banco de dados.")
         return
     
-    for linha in pagina_clientes.iter_rows(min_row=2):
-        nome = linha[0].value
-        telefone = str(linha[1].value).strip()
-        vencimento = linha[2].value
-        
+    for nome, telefone, vencimento in clientes:
         if not nome or not telefone or not vencimento:
-            print(f"Dados incompletos para a linha: {linha[0].row}")
+            print(f"Dados incompletos para o cliente: {nome}")
             continue
         
         data_formatada = formatar_data(vencimento)
@@ -125,12 +181,9 @@ def main():
         
         print(f"Enviando para {nome} ({telefone}): {mensagem}")
         sucesso = enviar_mensagem_whatsapp(telefone, mensagem)
+        marcar_enviado(telefone, sucesso)
         
-        if not sucesso:
-            with open('erros.csv', 'a', encoding='utf-8') as arquivo:
-                arquivo.write(f"{nome},{telefone}\n")
-
-    print("Processo concluído. Verifique 'erros.csv' para falhas.")
+    print("Processo concluído. Verifique o banco de dados para clientes com falha.")
 
 if __name__ == "__main__":
     main()
