@@ -2,12 +2,10 @@ import sqlite3
 import openpyxl
 from datetime import datetime
 
-# Configurações
 EXCEL_FILE = 'clientes.xlsx'
 DB_NAME = 'clientes.db'
 
 def init_db():
-    """Inicializa o banco de dados com a estrutura correta"""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
@@ -27,22 +25,17 @@ def init_db():
     conn.close()
 
 def importar_dados():
-    """Importa dados do Excel para o banco de dados SQLite"""
     try:
-        # Conectar ao banco de dados
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Abrir a planilha Excel
         workbook = openpyxl.load_workbook(EXCEL_FILE)
-        planilha = workbook['Sheet1']  # Assumindo que os dados estão na Sheet1
+        planilha = workbook['Sheet1']
         
-        # Contadores para estatísticas
         total = 0
         importados = 0
         duplicados = 0
         
-        # Percorrer as linhas da planilha (começando da linha 2)
         for linha in planilha.iter_rows(min_row=2, values_only=True):
             total += 1
             
@@ -50,29 +43,24 @@ def importar_dados():
             telefone = str(linha[1]).strip() if len(linha) > 1 else None
             data_venc = linha[2] if len(linha) > 2 else None
             
-            # Validar dados básicos
             if not nome or not telefone or not data_venc:
                 print(f"[AVISO] Linha {total+1} ignorada - dados incompletos")
                 continue
             
-            # Verificar se telefone já existe no banco
             cursor.execute("SELECT 1 FROM clientes WHERE telefone = ?", (telefone,))
             if cursor.fetchone():
                 duplicados += 1
                 print(f"[AVISO] Telefone {telefone} já existe - ignorando duplicata")
                 continue
             
-            # Formatar a data corretamente
             if isinstance(data_venc, datetime):
                 data_formatada = data_venc.strftime('%Y-%m-%d')
             else:
                 try:
-                    # Tentar converter strings de data
                     data_formatada = datetime.strptime(str(data_venc), '%d/%m/%Y').strftime('%Y-%m-%d')
                 except ValueError:
                     data_formatada = str(data_venc)
             
-            # Inserir no banco de dados
             cursor.execute("""
             INSERT INTO clientes (nome, telefone, data_vencimento)
             VALUES (?, ?, ?)

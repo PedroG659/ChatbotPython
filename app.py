@@ -9,15 +9,9 @@ import time
 import pyautogui
 from urllib.parse import quote
 
-# Assuming DB_NAME, openai.api_key are set as in your original script
 DB_NAME = "clientes.db"
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Re-include your existing functions here:
-# init_db, get_clientes_pendentes, marcar_enviado,
-# gerar_mensagem_com_ia, esperar_elemento, enviar_mensagem_whatsapp, formatar_data
-
-# Placeholder for the original functions (you'd paste them here)
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -92,19 +86,17 @@ def enviar_mensagem_whatsapp(numero, mensagem):
         url = f'https://web.whatsapp.com/send?phone={numero}&text={mensagem_codificada}'
 
         webbrowser.open(url, new=2)
-        time.sleep(10) # Give WhatsApp Web time to load
+        time.sleep(10)
 
-        # This part requires 'seta.png' in the same directory as the script
-        # Ensure 'seta.png' is a clear image of the WhatsApp send button
         try:
             botao_enviar = esperar_elemento('seta.png', timeout=15)
             pyautogui.click(botao_enviar)
-            time.sleep(2) # Give time for the message to send
-            pyautogui.hotkey('ctrl', 'w') # Close the tab
+            time.sleep(2)
+            pyautogui.hotkey('ctrl', 'w')
             return True
         except TimeoutError as e:
             messagebox.showerror("Erro de Automação", f"Não foi possível encontrar o botão de envio do WhatsApp: {e}")
-            pyautogui.hotkey('ctrl', 'w') # Try to close the tab even on failure
+            pyautogui.hotkey('ctrl', 'w')
             return False
 
     except Exception as e:
@@ -115,27 +107,23 @@ def formatar_data(data):
     if isinstance(data, datetime):
         return data.strftime('%d/%m/%Y')
     elif isinstance(data, str):
-        # Basic validation/reformatting if needed, assuming 'YYYY-MM-DD' from DB
         try:
             return datetime.strptime(data, '%Y-%m-%d').strftime('%d/%m/%Y')
         except ValueError:
-            return data # Return as is if format doesn't match
+            return data
     else:
         return "Data inválida"
-
 
 class WhatsAppSenderApp:
     def __init__(self, master):
         self.master = master
         master.title("Automatizador de Mensagens WhatsApp")
-        master.geometry("600x400") # Set window size
+        master.geometry("600x400")
 
-        # Configure grid
         master.grid_rowconfigure(0, weight=0)
         master.grid_rowconfigure(1, weight=1)
         master.grid_columnconfigure(0, weight=1)
 
-        # Control Frame
         self.control_frame = tk.Frame(master)
         self.control_frame.grid(row=0, column=0, pady=10)
 
@@ -151,7 +139,6 @@ class WhatsAppSenderApp:
         self.btn_send_messages = tk.Button(self.control_frame, text="Iniciar Envio de Mensagens", command=self.send_all_pending_messages)
         self.btn_send_messages.pack(side=tk.LEFT, padx=5)
 
-        # Log Area
         self.log_frame = tk.LabelFrame(master, text="Logs de Atividade")
         self.log_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.log_frame.grid_rowconfigure(0, weight=1)
@@ -161,14 +148,14 @@ class WhatsAppSenderApp:
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         self.log("Aplicação iniciada. Por favor, inicialize o banco de dados e adicione clientes.")
-        init_db() # Ensure DB is initialized when app starts
+        init_db()
 
     def log(self, message):
         self.log_text.config(state='normal')
         self.log_text.insert(tk.END, f"{datetime.now().strftime('%H:%M:%S')} - {message}\n")
         self.log_text.yview(tk.END)
         self.log_text.config(state='disabled')
-        self.master.update_idletasks() # Refresh GUI
+        self.master.update_idletasks()
 
     def init_database(self):
         init_db()
@@ -216,7 +203,6 @@ class WhatsAppSenderApp:
             data_formatada = formatar_data(vencimento)
             mensagem = gerar_mensagem_com_ia(nome, data_formatada)
 
-            # Use a Tkinter messagebox for visual confirmation
             confirmation_text = (
                 f"Confirmação de Envio:\n\n"
                 f"Nome: {nome}\n"
@@ -235,13 +221,13 @@ class WhatsAppSenderApp:
                     self.log(f"Falha ao enviar mensagem para {nome}. Marcado como falha.")
             else:
                 self.log(f"Envio para {nome} ({telefone}) cancelado pelo usuário.")
-                marcar_enviado(telefone, False) # Mark as failed if cancelled
+                marcar_enviado(telefone, False)
 
         self.log("Processo de envio de mensagens concluído.")
         messagebox.showinfo("Envio Concluído", "Todas as mensagens pendentes foram processadas.")
 
 if __name__ == "__main__":
-    init_db() # Ensure DB is initialized before starting the app
+    init_db()
     root = tk.Tk()
     app = WhatsAppSenderApp(root)
     root.mainloop()
