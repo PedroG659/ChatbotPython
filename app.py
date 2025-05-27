@@ -117,7 +117,7 @@ def formatar_data(data):
 class WhatsAppSenderApp:
     def __init__(self, master):
         self.master = master
-        master.title("Automatizador de Mensagens WhatsApp")
+        master.title("Interface Gráfica")
         master.geometry("600x400")
 
         master.grid_rowconfigure(0, weight=0)
