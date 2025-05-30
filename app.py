@@ -8,6 +8,7 @@ import webbrowser
 import time
 import pyautogui
 from urllib.parse import quote
+import re
 
 DB_NAME = "clientes.db"
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -114,6 +115,10 @@ def formatar_data(data):
     else:
         return "Data inválida"
 
+def validar_telefone(telefone):
+
+    return bool(re.fullmatch(r"\d{12,14}", telefone))
+
 class WhatsAppSenderApp:
     def __init__(self, master):
         self.master = master
@@ -163,11 +168,22 @@ class WhatsAppSenderApp:
 
     def add_new_client(self):
         nome = simpledialog.askstring("Adicionar Cliente", "Nome do Cliente:", parent=self.master)
-        if not nome: return
-        telefone = simpledialog.askstring("Adicionar Cliente", "Telefone (com código do país, ex: 5511987654321):", parent=self.master)
-        if not telefone: return
+        if not nome:
+            return
+
+        telefone = None
+        while not telefone:
+            telefone_input = simpledialog.askstring("Adicionar Cliente", "Telefone (com código do país, ex: 5511987654321):", parent=self.master)
+            if telefone_input is None:
+                return 
+            if validar_telefone(telefone_input):
+                telefone = telefone_input
+            else:
+                messagebox.showwarning("Telefone Inválido", "O número deve conter apenas dígitos e estar no formato internacional (ex: 5511987654321).")
+
         data_vencimento = simpledialog.askstring("Adicionar Cliente", "Data de Vencimento (YYYY-MM-DD):", parent=self.master)
-        if not data_vencimento: return
+        if not data_vencimento:
+            return
 
         try:
             conn = sqlite3.connect(DB_NAME)
