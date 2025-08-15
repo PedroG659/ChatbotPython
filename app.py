@@ -14,6 +14,7 @@ DB_NAME = "clientes.db"
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def init_db():
+    """Inicializa ou verifica o banco de dados e as tabelas necessárias."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("""
@@ -27,10 +28,20 @@ def init_db():
         falha INTEGER DEFAULT 0
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS agendamentos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        data_agendamento TEXT NOT NULL,
+        hora_agendamento TEXT NOT NULL,
+        criado_em TEXT NOT NULL
+    )
+    """)
     conn.commit()
     conn.close()
 
 def get_clientes_pendentes():
+    """Busca clientes com mensagens pendentes para envio."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT nome, telefone, data_vencimento FROM clientes WHERE enviado = 0 AND falha = 0")
@@ -38,7 +49,17 @@ def get_clientes_pendentes():
     conn.close()
     return clientes
 
+def get_agendamentos():
+    """Busca todos os agendamentos salvos no banco de dados."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT nome, data_agendamento, hora_agendamento FROM agendamentos ORDER BY data_agendamento, hora_agendamento")
+    agendamentos = cursor.fetchall()
+    conn.close()
+    return agendamentos
+
 def marcar_enviado(telefone, sucesso):
+    """Atualiza o status de um cliente após a tentativa de envio."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     if sucesso:
@@ -99,7 +120,6 @@ def enviar_mensagem_whatsapp(numero, mensagem):
             messagebox.showerror("Erro de Automação", f"Não foi possível encontrar o botão de envio do WhatsApp: {e}")
             pyautogui.hotkey('ctrl', 'w')
             return False
-
     except Exception as e:
         messagebox.showerror("Erro ao Abrir WhatsApp", f"Erro ao enviar mensagem para {numero}: {str(e)}")
         return False
@@ -116,14 +136,14 @@ def formatar_data(data):
         return "Data inválida"
 
 def validar_telefone(telefone):
-
     return bool(re.fullmatch(r"\d{12,14}", telefone))
 
 class WhatsAppSenderApp:
+    """Classe principal da aplicação com a interface gráfica."""
     def __init__(self, master):
         self.master = master
-        master.title("Interface Gráfica")
-        master.geometry("600x400")
+        master.title("Gerenciador de Clientes e Agendamentos")
+        master.geometry("700x500")
 
         master.grid_rowconfigure(0, weight=0)
         master.grid_rowconfigure(1, weight=1)
@@ -137,6 +157,9 @@ class WhatsAppSenderApp:
 
         self.btn_add_client = tk.Button(self.control_frame, text="Adicionar Cliente", command=self.add_new_client)
         self.btn_add_client.pack(side=tk.LEFT, padx=5)
+        
+        self.btn_add_appointment = tk.Button(self.control_frame, text="Adicionar Agendamento", command=self.add_new_appointment)
+        self.btn_add_appointment.pack(side=tk.LEFT, padx=5)
 
         self.btn_start_whatsapp = tk.Button(self.control_frame, text="Abrir WhatsApp Web", command=self.open_whatsapp_web)
         self.btn_start_whatsapp.pack(side=tk.LEFT, padx=5)
@@ -144,7 +167,7 @@ class WhatsAppSenderApp:
         self.btn_send_messages = tk.Button(self.control_frame, text="Iniciar Envio de Mensagens", command=self.send_all_pending_messages)
         self.btn_send_messages.pack(side=tk.LEFT, padx=5)
 
-        self.log_frame = tk.LabelFrame(master, text="Logs de Atividade")
+        self.log_frame = tk.LabelFrame(master, text="Logs e Agendamentos")
         self.log_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
         self.log_frame.grid_rowconfigure(0, weight=1)
         self.log_frame.grid_columnconfigure(0, weight=1)
@@ -152,8 +175,9 @@ class WhatsAppSenderApp:
         self.log_text = scrolledtext.ScrolledText(self.log_frame, wrap=tk.WORD, state='disabled', width=70, height=15)
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        self.log("Aplicação iniciada. Por favor, inicialize o banco de dados e adicione clientes.")
+        self.log("Aplicação iniciada. Por favor, inicialize o banco de dados e adicione clientes e/ou agendamentos.")
         init_db()
+        self.update_log_with_agendamentos()
 
     def log(self, message):
         self.log_text.config(state='normal')
@@ -162,9 +186,25 @@ class WhatsAppSenderApp:
         self.log_text.config(state='disabled')
         self.master.update_idletasks()
 
+    def update_log_with_agendamentos(self):
+        self.log_text.config(state='normal')
+        self.log_text.delete(1.0, tk.END)
+        self.log_text.config(state='disabled')
+        self.log("Carregando agendamentos...")
+        
+        agendamentos = get_agendamentos()
+        if agendamentos:
+            self.log("\n--- AGENDAMENTOS ---")
+            for nome, data, hora in agendamentos:
+                self.log(f"Nome: {nome} | Data: {formatar_data(data)} | Hora: {hora}")
+            self.log("------------------\n")
+        else:
+            self.log("\nNenhum agendamento encontrado.\n")
+
     def init_database(self):
         init_db()
         self.log("Banco de dados inicializado/verificado.")
+        self.update_log_with_agendamentos()
 
     def add_new_client(self):
         nome = simpledialog.askstring("Adicionar Cliente", "Nome do Cliente:", parent=self.master)
@@ -175,7 +215,7 @@ class WhatsAppSenderApp:
         while not telefone:
             telefone_input = simpledialog.askstring("Adicionar Cliente", "Telefone (com código do país, ex: 5511987654321):", parent=self.master)
             if telefone_input is None:
-                return 
+                return
             if validar_telefone(telefone_input):
                 telefone = telefone_input
             else:
@@ -189,13 +229,39 @@ class WhatsAppSenderApp:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
             cursor.execute("INSERT INTO clientes (nome, telefone, data_vencimento, enviado, falha) VALUES (?, ?, ?, 0, 0)",
-                           (nome, telefone, data_vencimento))
+                            (nome, telefone, data_vencimento))
             conn.commit()
             conn.close()
             self.log(f"Cliente '{nome}' adicionado com sucesso.")
         except Exception as e:
             self.log(f"Erro ao adicionar cliente: {e}")
             messagebox.showerror("Erro", f"Erro ao adicionar cliente: {e}")
+            
+    def add_new_appointment(self):
+        nome = simpledialog.askstring("Adicionar Agendamento", "Nome do Cliente/Agendamento:", parent=self.master)
+        if not nome:
+            return
+            
+        data_agendamento = simpledialog.askstring("Adicionar Agendamento", "Data (YYYY-MM-DD):", parent=self.master)
+        if not data_agendamento:
+            return
+            
+        hora_agendamento = simpledialog.askstring("Adicionar Agendamento", "Hora (HH:MM):", parent=self.master)
+        if not hora_agendamento:
+            return
+            
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO agendamentos (nome, data_agendamento, hora_agendamento, criado_em) VALUES (?, ?, ?, ?)",
+                            (nome, data_agendamento, hora_agendamento, datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+            conn.commit()
+            conn.close()
+            self.log(f"Agendamento para '{nome}' adicionado com sucesso.")
+            self.update_log_with_agendamentos()
+        except Exception as e:
+            self.log(f"Erro ao adicionar agendamento: {e}")
+            messagebox.showerror("Erro", f"Erro ao adicionar agendamento: {e}")
 
     def open_whatsapp_web(self):
         self.log("Abrindo WhatsApp Web. Por favor, faça login manualmente se necessário.")
@@ -247,3 +313,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = WhatsAppSenderApp(root)
     root.mainloop()
+
