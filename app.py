@@ -462,11 +462,9 @@ class WhatsAppSenderApp:
             self.atualizar_status("Erro ao adicionar cliente")
             
     def view_clients(self):
-        """Exibe uma janela com todos os clientes cadastrados."""
         self.atualizar_status("Carregando lista de clientes...")
         clientes = get_todos_clientes()
         
-        # Criar uma nova janela
         client_window = tk.Toplevel(self.master)
         client_window.title("👥 Lista de Clientes")
         client_window.geometry("900x500")
@@ -474,18 +472,15 @@ class WhatsAppSenderApp:
         client_window.transient(self.master)
         client_window.grab_set()
         
-        # Header
         header = tk.Label(client_window, text="📋 Lista de Clientes Cadastrados", 
                          font=('Segoe UI', 14, 'bold'), bg=COR_TERCIARIA, fg=COR_PRIMARIA)
         header.pack(pady=10)
         
-        # Frame para a treeview
         tree_frame = ttk.Frame(client_window)
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
         
-        # Treeview
         columns = ("ID", "Nome", "Telefone", "Vencimento", "Status", "Data Envio")
         tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=15)
         
@@ -495,12 +490,10 @@ class WhatsAppSenderApp:
         
         tree.grid(row=0, column=0, sticky="nsew")
         
-        # Scrollbar
         scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         tree.configure(yscrollcommand=scrollbar.set)
         
-        # Preencher com dados
         for cliente in clientes:
             id_cliente, nome, telefone, vencimento, enviado, data_envio, falha = cliente
             
@@ -564,7 +557,6 @@ class WhatsAppSenderApp:
 
     def send_all_pending_messages(self):
         self.atualizar_status("Preparando envio de mensagens...")
-        # Executar em uma thread separada para não travar a interface
         thread = threading.Thread(target=self._send_all_pending_messages_thread)
         thread.daemon = True
         thread.start()
@@ -588,10 +580,8 @@ class WhatsAppSenderApp:
             data_formatada = formatar_data(vencimento)
             mensagem = gerar_mensagem_com_ia(nome, data_formatada)
 
-            # Usar invoke para operações na thread da interface
             self.master.after(0, lambda n=nome, t=telefone, m=mensagem, d=data_formatada: self._ask_confirmation(n, t, m, d))
             
-            # Esperar pela resposta do usuário
             while self.user_response is None:
                 time.sleep(0.1)
                 
