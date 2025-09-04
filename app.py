@@ -236,8 +236,8 @@ def enviar_mensagem_whatsapp(numero, mensagem):
         time.sleep(10)
 
         try:
-            botao_enviar = esperar_elemento('seta.png', timeout=15)
-            pyautogui.click(botao_enviar)
+            #botao_enviar = esperar_elemento('seta.png', timeout=15)
+            #pyautogui.click(botao_enviar)
             time.sleep(2)
             pyautogui.hotkey('ctrl', 'w')
             return True
