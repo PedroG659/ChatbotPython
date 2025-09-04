@@ -60,7 +60,6 @@ def init_db():
     )
     """)
     
-    # Tabela de agendamentos - versão atualizada
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS agendamentos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,21 +74,17 @@ def init_db():
     conn.commit()
     conn.close()
     
-    # Verificar e atualizar schema se necessário
     update_database_schema()
 
 def update_database_schema():
-    """Atualiza o schema do banco de dados se necessário."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
     try:
-        # Verificar se a coluna 'enviado' existe na tabela agendamentos
         cursor.execute("PRAGMA table_info(agendamentos)")
         columns = [column[1] for column in cursor.fetchall()]
         
         if 'enviado' not in columns:
-            # Adicionar a coluna enviado se não existir
             cursor.execute("ALTER TABLE agendamentos ADD COLUMN enviado INTEGER DEFAULT 0")
             conn.commit()
             print("Coluna 'enviado' adicionada à tabela agendamentos")
@@ -100,7 +95,6 @@ def update_database_schema():
     conn.close()
 
 def get_clientes_pendentes():
-    """Busca clientes com mensagens pendentes para envio."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT nome, telefone, data_vencimento FROM clientes WHERE enviado = 0 AND falha = 0")
@@ -109,7 +103,6 @@ def get_clientes_pendentes():
     return clientes
 
 def get_todos_clientes():
-    """Busca todos os clientes no banco de dados."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT id, nome, telefone, data_vencimento, enviado, data_envio, falha FROM clientes ORDER BY nome")
@@ -118,18 +111,15 @@ def get_todos_clientes():
     return clientes
 
 def get_agendamentos():
-    """Busca todos os agendamentos salvos no banco de dados."""
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Verificar se a coluna enviado existe antes de tentar usá-la
     cursor.execute("PRAGMA table_info(agendamentos)")
     columns = [column[1] for column in cursor.fetchall()]
     
     if 'enviado' in columns:
         cursor.execute("SELECT id, nome, data_agendamento, hora_agendamento, enviado FROM agendamentos ORDER BY data_agendamento, hora_agendamento")
     else:
-        # Se a coluna não existir, usar valor padrão 0
         cursor.execute("SELECT id, nome, data_agendamento, hora_agendamento, 0 as enviado FROM agendamentos ORDER BY data_agendamento, hora_agendamento")
     
     agendamentos = cursor.fetchall()
@@ -137,7 +127,6 @@ def get_agendamentos():
     return agendamentos
 
 def get_agendamentos_hoje():
-    """Busca agendamentos para hoje que ainda não foram enviados."""
     hoje = datetime.now().strftime('%Y-%m-%d')
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -185,7 +174,6 @@ def gerar_mensagem_com_ia(nome, data_venc):
         "Use um tom informal e amigável. Inclua emojis se apropriado."
     )
     try:
-        # Verificar se a API key está configurada
         if not openai.api_key:
             raise Exception("API key da OpenAI não configurada")
             
@@ -210,7 +198,6 @@ def gerar_mensagem_agendamento(nome, data, hora):
         "Use um tom informal e amigável. Inclua emojis se apropriado."
     )
     try:
-        # Verificar se a API key está configurada
         if not openai.api_key:
             raise Exception("API key da OpenAI não configurada")
             
@@ -249,7 +236,6 @@ def enviar_mensagem_whatsapp(numero, mensagem):
         time.sleep(10)
 
         try:
-            # Tentativa de encontrar e clicar no botão de enviar
             botao_enviar = esperar_elemento('seta.png', timeout=15)
             pyautogui.click(botao_enviar)
             time.sleep(2)
@@ -284,7 +270,6 @@ def validar_telefone(telefone):
     return bool(re.fullmatch(r"\d{12,14}", telefone))
 
 class BotaoEstilizado(tk.Button):
-    """Botão personalizado com efeitos hover"""
     def __init__(self, master=None, **kwargs):
         super().__init__(master, **kwargs)
         self.default_bg = self.cget('background')
@@ -298,7 +283,6 @@ class BotaoEstilizado(tk.Button):
         self.config(background=self.default_bg)
 
 class WhatsAppSenderApp:
-    """Classe principal da aplicação com a interface gráfica estilizada."""
     def __init__(self, master):
         self.master = master
         master.title("📱 Gerenciador de Clientes e Agendamentos")
@@ -306,17 +290,13 @@ class WhatsAppSenderApp:
         master.minsize(900, 600)
         master.configure(bg=COR_TERCIARIA)
         
-        # Configurar estilo
         configurar_estilo()
 
-        # Configurar grid para expansão
         master.grid_rowconfigure(1, weight=1)
         master.grid_columnconfigure(0, weight=1)
 
-        # Variável para resposta do usuário
         self.user_response = None
 
-        # Header com título
         header_frame = ttk.Frame(master)
         header_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
         
@@ -328,12 +308,10 @@ class WhatsAppSenderApp:
                             font=('Segoe UI', 10), bg=COR_TERCIARIA, fg=COR_SECUNDARIA)
         subtitulo.pack(pady=2)
 
-        # Frame de controles
         self.control_frame = ttk.Frame(master)
         self.control_frame.grid(row=1, column=0, pady=10, sticky="ew", padx=20)
         self.control_frame.grid_columnconfigure(0, weight=1)
 
-        # Botões principais com ícones
         button_frame = ttk.Frame(self.control_frame)
         button_frame.grid(row=0, column=0, pady=10)
 
@@ -353,18 +331,15 @@ class WhatsAppSenderApp:
                                 relief='flat', bd=0, padx=15, pady=8, cursor='hand2')
             btn.pack(side=tk.LEFT, padx=5, pady=5)
 
-        # Notebook para abas
         self.notebook = ttk.Notebook(master)
         self.notebook.grid(row=2, column=0, sticky="nsew", padx=20, pady=(0, 20))
         self.notebook.configure(style='TNotebook')
 
-        # Aba de Logs
         self.log_frame = ttk.Frame(self.notebook, style='TFrame')
         self.notebook.add(self.log_frame, text="📝 Logs do Sistema")
         self.log_frame.grid_rowconfigure(0, weight=1)
         self.log_frame.grid_columnconfigure(0, weight=1)
 
-        # Frame de log com borda
         log_container = ttk.Frame(self.log_frame, style='TFrame')
         log_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         log_container.grid_rowconfigure(0, weight=1)
@@ -375,19 +350,16 @@ class WhatsAppSenderApp:
                                                 bg='white', fg=COR_PRIMARIA, relief='sunken', bd=2)
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
-        # Aba de Agendamentos
         self.appointment_frame = ttk.Frame(self.notebook, style='TFrame')
         self.notebook.add(self.appointment_frame, text="📅 Agendamentos")
         self.appointment_frame.grid_rowconfigure(0, weight=1)
         self.appointment_frame.grid_columnconfigure(0, weight=1)
 
-        # Container para treeview
         tree_container = ttk.Frame(self.appointment_frame, style='TFrame')
         tree_container.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
         tree_container.grid_rowconfigure(0, weight=1)
         tree_container.grid_columnconfigure(0, weight=1)
 
-        # Treeview para agendamentos
         columns = ("Nome", "Data", "Hora", "Status")
         self.appointment_tree = ttk.Treeview(tree_container, columns=columns, show="headings", height=15)
         
@@ -397,18 +369,15 @@ class WhatsAppSenderApp:
         
         self.appointment_tree.grid(row=0, column=0, sticky="nsew")
         
-        # Scrollbar para a treeview
         scrollbar = ttk.Scrollbar(tree_container, orient="vertical", command=self.appointment_tree.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.appointment_tree.configure(yscrollcommand=scrollbar.set)
 
-        # Status bar
         self.status_bar = tk.Label(master, text="Pronto | Sistema Inicializado", 
                                   relief='sunken', anchor='w', font=('Segoe UI', 9),
                                   bg=COR_PRIMARIA, fg='white')
         self.status_bar.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 10))
 
-        # Inicialização
         self.log("🚀 Aplicação iniciada com sucesso!")
         self.log("💾 Banco de dados verificado e pronto para uso")
         self.log("👆 Use os botões acima para gerenciar clientes e agendamentos")
@@ -419,7 +388,6 @@ class WhatsAppSenderApp:
     def log(self, message):
         self.log_text.config(state='normal')
         
-        # Adicionar cor baseada no tipo de mensagem
         if "erro" in message.lower() or "falha" in message.lower():
             tag = "erro"
             self.log_text.tag_config(tag, foreground=COR_ERRO)
@@ -439,11 +407,9 @@ class WhatsAppSenderApp:
         self.master.update_idletasks()
 
     def atualizar_status(self, mensagem):
-        """Atualiza a barra de status"""
         self.status_bar.config(text=f"🟢 {mensagem}")
 
     def update_appointment_tree(self):
-        """Atualiza a treeview de agendamentos com dados do banco."""
         for item in self.appointment_tree.get_children():
             self.appointment_tree.delete(item)
             
