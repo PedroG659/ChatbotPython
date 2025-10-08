@@ -25,10 +25,7 @@ COR_AVISO = "#f39c12"
 def configurar_estilo():
     estilo = ttk.Style()
     
-    try:
-        estilo.theme_use('clam')
-    except Exception:
-        pass
+    estilo.theme_use('clam')
     
     estilo.configure('TFrame', background=COR_TERCIARIA)
     estilo.configure('TLabel', background=COR_TERCIARIA, foreground=COR_PRIMARIA, font=('Segoe UI', 10))
@@ -270,9 +267,7 @@ def formatar_data(data):
         return "Data inválida"
 
 def validar_telefone(telefone):
-    # remove caracteres não-numéricos e valida entre 11 e 14 dígitos (ex: DDI+DDD+numero)
-    numeros = re.sub(r'\D', '', telefone or "")
-    return bool(re.fullmatch(r"\d{11,14}", numeros))
+    return bool(re.fullmatch(r"\d{12,14}", telefone))
 
 class BotaoEstilizado(tk.Button):
     def __init__(self, master=None, **kwargs):
@@ -430,147 +425,42 @@ class WhatsAppSenderApp:
         self.atualizar_status("Banco de dados verificado")
 
     def add_new_client(self):
-        """
-        Abre um formulário (Toplevel) com campos:
-        - Nome (obrigatório)
-        - Telefone (obrigatório) - validação
-        - CPF (opcional visual, validado para 11 dígitos; máscara aplicada)
-        - E-mail (opcional, validado por regex)
-        - Data de Vencimento (obrigatório)
-        
-        Observação: CPF e E-mail são apenas validados (Opção B) e NÃO são salvos no DB.
-        """
         self.atualizar_status("Adicionando novo cliente...")
-        
-        add_window = tk.Toplevel(self.master)
-        add_window.title("Adicionar Cliente")
-        add_window.geometry("420x380")
-        add_window.configure(bg=COR_TERCIARIA)
-        add_window.transient(self.master)
-        add_window.grab_set()
+        nome = simpledialog.askstring("Adicionar Cliente", "Nome do Cliente:", parent=self.master)
+        if not nome:
+            self.atualizar_status("Operação cancelada")
+            return
 
-        # Layout simples usando grid
-        pad_y = 8
-        lbl_nome = tk.Label(add_window, text="Nome *", bg=COR_TERCIARIA, fg=COR_PRIMARIA)
-        lbl_nome.grid(row=0, column=0, sticky="w", padx=12, pady=(12,2))
-        entry_nome = tk.Entry(add_window, width=40)
-        entry_nome.grid(row=1, column=0, columnspan=2, padx=12, sticky="w")
-
-        lbl_telefone = tk.Label(add_window, text="Telefone (ex: 5511987654321) *", bg=COR_TERCIARIA, fg=COR_PRIMARIA)
-        lbl_telefone.grid(row=2, column=0, sticky="w", padx=12, pady=(12,2))
-        entry_telefone = tk.Entry(add_window, width=40)
-        entry_telefone.grid(row=3, column=0, columnspan=2, padx=12, sticky="w")
-
-        lbl_cpf = tk.Label(add_window, text="CPF (apenas números)", bg=COR_TERCIARIA, fg=COR_PRIMARIA)
-        lbl_cpf.grid(row=4, column=0, sticky="w", padx=12, pady=(12,2))
-        entry_cpf = tk.Entry(add_window, width=25)
-        entry_cpf.grid(row=5, column=0, padx=12, sticky="w")
-
-        lbl_email = tk.Label(add_window, text="E-mail", bg=COR_TERCIARIA, fg=COR_PRIMARIA)
-        lbl_email.grid(row=6, column=0, sticky="w", padx=12, pady=(12,2))
-        entry_email = tk.Entry(add_window, width=40)
-        entry_email.grid(row=7, column=0, columnspan=2, padx=12, sticky="w")
-
-        lbl_venc = tk.Label(add_window, text="Data de Vencimento (YYYY-MM-DD) *", bg=COR_TERCIARIA, fg=COR_PRIMARIA)
-        lbl_venc.grid(row=8, column=0, sticky="w", padx=12, pady=(12,2))
-        entry_venc = tk.Entry(add_window, width=25)
-        entry_venc.grid(row=9, column=0, padx=12, sticky="w")
-
-        # Dica visual sobre obrigatoriedade
-        lbl_obs = tk.Label(add_window, text="Campos com * são obrigatórios", font=('Segoe UI', 8), bg=COR_TERCIARIA, fg=COR_SECUNDARIA)
-        lbl_obs.grid(row=10, column=0, columnspan=2, sticky="w", padx=12, pady=(8,2))
-
-        # Função para aplicar máscara de CPF enquanto digita
-        def formatar_cpf(event=None):
-            texto = re.sub(r'\D', '', entry_cpf.get())
-            # Limitar a 11 dígitos
-            texto = texto[:11]
-            novo = ""
-            if len(texto) >= 1:
-                novo += texto[:3]
-            if len(texto) >= 4:
-                novo = texto[:3] + "." + texto[3:6]
-            if len(texto) >= 7:
-                novo = texto[:3] + "." + texto[3:6] + "." + texto[6:9]
-            if len(texto) >= 10:
-                novo = texto[:3] + "." + texto[3:6] + "." + texto[6:9] + "-" + texto[9:11]
-            # Evita reposicionar cursor de forma estranha: só atualiza se diferente
-            current = entry_cpf.get()
-            if novo != current:
-                entry_cpf.delete(0, tk.END)
-                entry_cpf.insert(0, novo)
-
-        entry_cpf.bind('<KeyRelease>', formatar_cpf)
-
-        # Função de validação e salvar (inserir no DB)
-        def salvar_cliente():
-            nome = entry_nome.get().strip()
-            telefone = entry_telefone.get().strip()
-            cpf = entry_cpf.get().strip()
-            email = entry_email.get().strip()
-            venc = entry_venc.get().strip()
-
-            # Validações básicas
-            if not nome:
-                messagebox.showerror("Validação", "Nome é obrigatório.")
+        telefone = None
+        while not telefone:
+            telefone_input = simpledialog.askstring("Adicionar Cliente", "Telefone (com código do país, ex: 5511987654321):", parent=self.master)
+            if telefone_input is None:
+                self.atualizar_status("Operação cancelada")
                 return
+            if validar_telefone(telefone_input):
+                telefone = telefone_input
+            else:
+                messagebox.showwarning("Telefone Inválido", "O número deve conter apenas dígitos e estar no formato internacional (ex: 5511987654321).")
 
-            # telefone: remover não dígitos para validação e armazenar em formato numérico
-            telefone_numeros = re.sub(r'\D', '', telefone)
-            if not validar_telefone(telefone_numeros):
-                messagebox.showerror("Validação", "Telefone inválido. Insira no formato internacional (ex: 5511987654321).")
-                return
+        data_vencimento = simpledialog.askstring("Adicionar Cliente", "Data de Vencimento (YYYY-MM-DD):", parent=self.master)
+        if not data_vencimento:
+            self.atualizar_status("Operação cancelada")
+            return
 
-            # Data de vencimento: checar formato YYYY-MM-DD
-            try:
-                datetime.strptime(venc, '%Y-%m-%d')
-            except Exception:
-                messagebox.showerror("Validação", "Data de vencimento inválida. Use o formato YYYY-MM-DD.")
-                return
-
-            # CPF: opcional, mas se preenchido checar 11 dígitos
-            cpf_numeros = re.sub(r'\D', '', cpf)
-            if cpf_numeros:
-                if len(cpf_numeros) != 11:
-                    messagebox.showerror("Validação", "CPF inválido. Deve conter 11 dígitos.")
-                    return
-
-            # E-mail: opcional, mas se preenchido checar formato básico
-            if email:
-                email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-                if not re.match(email_regex, email):
-                    messagebox.showerror("Validação", "E-mail inválido. Verifique o formato.")
-                    return
-
-            # Tudo ok — salvar no DB (sem CPF/email conforme Opção B)
-            try:
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO clientes (nome, telefone, data_vencimento, enviado, falha) VALUES (?, ?, ?, 0, 0)",
-                                (nome, telefone_numeros, venc))
-                conn.commit()
-                conn.close()
-                self.log(f"✅ Cliente '{nome}' adicionado com sucesso!")
-                self.atualizar_status(f"Cliente {nome} adicionado com sucesso")
-                add_window.destroy()
-            except Exception as e:
-                self.log(f"❌ Erro ao adicionar cliente: {e}")
-                messagebox.showerror("Erro", f"Erro ao adicionar cliente: {e}")
-                self.atualizar_status("Erro ao adicionar cliente")
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-
-        btn_frame = tk.Frame(add_window, bg=COR_TERCIARIA)
-        btn_frame.grid(row=11, column=0, pady=12, padx=12, sticky="w")
-
-        btn_save = tk.Button(btn_frame, text="Salvar", command=salvar_cliente, bg=COR_BOTAO, fg="white", bd=0, padx=12, pady=6, cursor='hand2')
-        btn_save.pack(side=tk.LEFT, padx=(0,8))
-
-        btn_cancel = tk.Button(btn_frame, text="Cancelar", command=add_window.destroy, bg="#bdc3c7", fg=COR_PRIMARIA, bd=0, padx=12, pady=6, cursor='hand2')
-        btn_cancel.pack(side=tk.LEFT)
-
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO clientes (nome, telefone, data_vencimento, enviado, falha) VALUES (?, ?, ?, 0, 0)",
+                            (nome, telefone, data_vencimento))
+            conn.commit()
+            conn.close()
+            self.log(f"✅ Cliente '{nome}' adicionado com sucesso!")
+            self.atualizar_status(f"Cliente {nome} adicionado com sucesso")
+        except Exception as e:
+            self.log(f"❌ Erro ao adicionar cliente: {e}")
+            messagebox.showerror("Erro", f"Erro ao adicionar cliente: {e}")
+            self.atualizar_status("Erro ao adicionar cliente")
+            
     def view_clients(self):
         self.atualizar_status("Carregando lista de clientes...")
         clientes = get_todos_clientes()
